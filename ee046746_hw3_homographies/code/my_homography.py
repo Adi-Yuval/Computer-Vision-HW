@@ -155,9 +155,9 @@ def ransacH(matches, locs1, locs2, nIter, tol):
     """
     return bestH
 
-def getPoints_SIFT(im1, im2, dist_thresh=0.4, contrast_thresh=0):
+def getPoints_SIFT(im1, im2, dist_thresh=0.4):
 
-    sift = cv2.SIFT_create(contrastThreshold=0.09)
+    sift = cv2.SIFT_create()
     kp1, des1 = sift.detectAndCompute(im1, None)
     kp2, des2 = sift.detectAndCompute(im2, None)
 
