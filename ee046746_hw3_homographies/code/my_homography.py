@@ -9,11 +9,54 @@ from scipy.io import savemat, loadmat
 #end imports
 
 #Add extra functions here:
-"""
-Your code here
-"""
-
 STICHED_IMAGE_SCALE = 1.3
+
+
+def stitch_our_points(im1, im2, p1, p2):
+    H2to1 = computeH(p1, p2)
+
+    interp_method = cv2.INTER_CUBIC
+    im1_warp = warpH(im1, H2to1, interp_method)
+
+    warped_image_translation = np.array(im1_warp.shape[:2]) - np.array(STICHED_IMAGE_SCALE*np.array(im1.shape[:2]), dtype=np.int)
+    stitched = imageStitching(im2, im1_warp, warped_image_translation)
+
+    return stitched
+
+
+def stitch_sift(im1, im2):
+    p1, p2 = getPoints_SIFT(im1, im2)
+    H2to1 = computeH(p1, p2)
+    interp_method = cv2.INTER_CUBIC
+    im1_warp = warpH(im1, H2to1, interp_method)
+    warped_image_translation = np.array(im1_warp.shape[:2]) - np.array(STICHED_IMAGE_SCALE * np.array(im1.shape[:2]),
+                                                                       dtype=np.int)
+    stitched = imageStitching(im2, im1_warp, warped_image_translation)
+    return stitched
+
+
+def stitch_incline_our_points():
+    im1 = cv2.cvtColor(cv2.imread('data/incline_L.png'), cv2.COLOR_BGR2RGB)
+    im2 = cv2.cvtColor(cv2.imread('data/incline_R.png'), cv2.COLOR_BGR2RGB)
+
+    # p1, p2 = getPoints(im1, im2, 8)
+    points_mat = loadmat('my_data/homography_points.mat')
+    p1 = points_mat['p1']
+    p2 = points_mat['p2']
+
+    stitched = stitch_our_points(im1, im2, p1, p2)
+    plt.imshow(stitched)
+    plt.show()
+
+
+def stitch_incline_sift():
+    im1 = cv2.cvtColor(cv2.imread('data/incline_L.png'), cv2.COLOR_BGR2RGB)
+    im2 = cv2.cvtColor(cv2.imread('data/incline_R.png'), cv2.COLOR_BGR2RGB)
+
+    stitched = stitch_sift(im1, im2)
+    plt.imshow(stitched)
+    plt.show()
+
 #Extra functions end
 
 # HW functions:
@@ -107,42 +150,40 @@ def ransacH(matches, locs1, locs2, nIter, tol):
     """
     return bestH
 
-def getPoints_SIFT(im1,im2):
-    """
-    Your code here
-    """
-    return p1,p2
+def getPoints_SIFT(im1, im2, dist_thresh=0.4):
+
+    sift = cv2.SIFT_create()
+    kp1, des1 = sift.detectAndCompute(im1, None)
+    kp2, des2 = sift.detectAndCompute(im2, None)
+
+    bf_matcher = cv2.BFMatcher()
+    matches = bf_matcher.knnMatch(des1, des2, k=2)
+
+    p1 = []
+    p2 = []
+    for m, n in matches:
+        if m.distance < dist_thresh * n.distance:
+            p1.append(kp1[m.queryIdx].pt)
+            p2.append(kp2[m.trainIdx].pt)
+
+    return np.array(p1).T, np.array(p2).T
+
 
 if __name__ == '__main__':
     print('my_homography')
 
-    im1 = cv2.cvtColor(cv2.imread('data/incline_L.png'), cv2.COLOR_BGR2RGB)
-    im2 = cv2.cvtColor(cv2.imread('data/incline_R.png'), cv2.COLOR_BGR2RGB)
+    # stitch_incline_our_points()
+    # stitch_incline_sift()
 
-    # p1, p2 = getPoints(im1, im2, 8)
+    # load beach images:
+    beach_images = []
+    for i in range(1, 6):
+        beach_images.append(cv2.imread('data/beach' + str(i) + '.jpg'))
 
-    points_mat = loadmat('my_data/homography_points.mat')
-    p1 = points_mat['p1']
-    p2 = points_mat['p2']
+    stitched_beach = beach_images[0]
+    for i in range(1, len(beach_images)):
+        stitched_beach = stitch_sift(stitched_beach, beach_images[i])
 
-    H2to1 = computeH(p1, p2)
-
-    interp_method = cv2.INTER_CUBIC
-    im1_warp = warpH(im1, H2to1, interp_method)
-
-    warped_image_translation = np.array(im1_warp.shape[:2]) - np.array(STICHED_IMAGE_SCALE*np.array(im1.shape[:2]), dtype=np.int)
-    stitched = imageStitching(im2, im1_warp, warped_image_translation)
-
-
-
-    plt.imshow(stitched)
+    plt.imshow(stitched_beach)
     plt.show()
-
-
-
-
-
-
-
-
 
