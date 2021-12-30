@@ -9,7 +9,7 @@ from scipy.io import savemat, loadmat
 #end imports
 
 #Add extra functions here:
-STICHED_IMAGE_SCALE = 1.3
+STICHED_IMAGE_SCALE = 1.2
 
 
 def stitch_our_points(im1, im2, p1, p2):
@@ -24,8 +24,13 @@ def stitch_our_points(im1, im2, p1, p2):
     return stitched
 
 
-def stitch_sift(im1, im2):
-    p1, p2 = getPoints_SIFT(im1, im2)
+def stitch_sift(im1, im2, threshold=0.4, k_matches=None):
+    p1, p2 = getPoints_SIFT(im1, im2, threshold)
+
+    if(k_matches is not None):
+        p1 = p1[:, :min(k_matches, p1.shape[1])]
+        p2 = p2[:, :min(k_matches, p2.shape[1])]
+
     H2to1 = computeH(p1, p2)
     interp_method = cv2.INTER_CUBIC
     im1_warp = warpH(im1, H2to1, interp_method)
@@ -150,12 +155,14 @@ def ransacH(matches, locs1, locs2, nIter, tol):
     """
     return bestH
 
-def getPoints_SIFT(im1, im2, dist_thresh=0.4):
+def getPoints_SIFT(im1, im2, dist_thresh=0.4, contrast_thresh=0):
 
-    sift = cv2.SIFT_create()
+    sift = cv2.SIFT_create(contrastThreshold=0.09)
     kp1, des1 = sift.detectAndCompute(im1, None)
     kp2, des2 = sift.detectAndCompute(im2, None)
 
+    # index_params = dict(algorithm=1, trees=5)
+    # search_params = dict(checks=50)
     bf_matcher = cv2.BFMatcher()
     matches = bf_matcher.knnMatch(des1, des2, k=2)
 
@@ -178,11 +185,25 @@ if __name__ == '__main__':
     # load beach images:
     beach_images = []
     for i in range(1, 6):
-        beach_images.append(cv2.imread('data/beach' + str(i) + '.jpg'))
+        im = cv2.imread('data/beach' + str(i) + '.jpg')
+        im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+        im = cv2.resize(im, (im.shape[0] // 4, im.shape[1] // 4))
+        beach_images.append(im)
+    beach_images.reverse()
 
-    stitched_beach = beach_images[0]
-    for i in range(1, len(beach_images)):
-        stitched_beach = stitch_sift(stitched_beach, beach_images[i])
+    # stitched_beach = beach_images[0]
+    # for i in range(1, len(beach_images)):
+    #     stitched_beach = stitch_sift(stitched_beach, beach_images[i], threshold=0.7, k_matches=50)
+    #     plt.imshow(stitched_beach)
+    #     plt.show()
+
+    stitched_beach_up = stitch_sift(beach_images[0], beach_images[1], threshold=0.7, k_matches=50)
+    stitched_beach_up = stitch_sift(stitched_beach_up, beach_images[2], threshold=0.7, k_matches=50)
+    stitched_beach_down = stitch_sift(beach_images[3], beach_images[4], threshold=0.5, k_matches=50)
+    plt.imshow(stitched_beach_down)
+    plt.show()
+    stitched_beach = stitch_sift(stitched_beach_up, stitched_beach_down, threshold=0.7, k_matches=50)
+
 
     plt.imshow(stitched_beach)
     plt.show()
