@@ -57,6 +57,52 @@ def stitch_incline_sift():
     plt.imshow(stitched)
     plt.show()
 
+
+def stitch_beach_sift():
+    beach_images = []
+    for i in range(1, 6):
+        im = cv2.imread('data/beach' + str(i) + '.jpg')
+        im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+        im = cv2.resize(im, (im.shape[0] // 2, im.shape[1] // 2))
+        beach_images.append(im)
+    beach_images.reverse()
+
+    stitched_beach_up = stitch_sift(beach_images[0], beach_images[1], threshold=0.5, k_matches=50)
+    stitched_beach_up = stitch_sift(stitched_beach_up, beach_images[2], threshold=0.5, k_matches=50)
+    # plt.imshow(stitched_beach_up)
+    # plt.show()
+    stitched_beach_down = stitch_sift(beach_images[4], beach_images[3], threshold=0.5, k_matches=50)
+    stitched_beach_down = stitch_sift(stitched_beach_down, beach_images[2], threshold=0.5, k_matches=50)
+    # plt.imshow(stitched_beach_down)
+    # plt.show()
+
+    stitched_beach = stitch_sift(stitched_beach_up, stitched_beach_down, threshold=0.5, k_matches=50)
+    plt.imshow(stitched_beach)
+    plt.show()
+
+
+def stitch_sintra_sift():
+    beach_images = []
+    for i in range(1, 6):
+        im = cv2.imread('data/sintra' + str(i) + '.JPG')
+        im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+        im = cv2.resize(im, (im.shape[0] // 2, im.shape[1] // 2))
+        beach_images.append(im)
+    beach_images.reverse()
+
+    stitched_beach_up = stitch_sift(beach_images[0], beach_images[1], threshold=0.5, k_matches=50)
+    stitched_beach_up = stitch_sift(stitched_beach_up, beach_images[2], threshold=0.5, k_matches=50)
+    # plt.imshow(stitched_beach_up)
+    # plt.show()
+    stitched_beach_down = stitch_sift(beach_images[4], beach_images[3], threshold=0.5, k_matches=50)
+    stitched_beach_down = stitch_sift(stitched_beach_down, beach_images[2], threshold=0.5, k_matches=50)
+    # plt.imshow(stitched_beach_down)
+    # plt.show()
+
+    stitched_beach = stitch_sift(stitched_beach_up, stitched_beach_down, threshold=0.5, k_matches=50)
+    plt.imshow(stitched_beach)
+    plt.show()
+
 #Extra functions end
 
 # HW functions:
@@ -195,49 +241,9 @@ if __name__ == '__main__':
 
     # stitch_incline_our_points()
     # stitch_incline_sift()
+    # stitch_beach_sift()
+    # stitch_sintra_sift()
 
-    # load beach images:
-    beach_images = []
-    for i in range(1, 6):
-        im = cv2.imread('data/beach' + str(i) + '.jpg')
-        im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
-        im = cv2.resize(im, (im.shape[0] // 2, im.shape[1] // 2))
-        beach_images.append(im)
-    beach_images.reverse()
-
-
-    # stitched_beach = beach_images[0]
-    # for i in range(1, len(beach_images)):
-    #     stitched_beach = stitch_sift(stitched_beach, beach_images[i], threshold=0.7, k_matches=25)
-    #     plt.imshow(stitched_beach)
-    #     plt.show()
-
-    # stitched_01 = stitch_sift(beach_images[0], beach_images[1], threshold=0.7, k_matches=25)
-    # plt.imshow(stitched_01)
-    # plt.show()
-    #
-    # stitched_10 = stitch_sift(beach_images[1], beach_images[0], threshold=0.7, k_matches=25)
-    # plt.imshow(stitched_10)
-    # plt.show()
-
-    #
-    stitched_beach_up = stitch_sift(beach_images[0], beach_images[1], threshold=0.5, k_matches=50)
-    stitched_beach_up = stitch_sift(stitched_beach_up, beach_images[2], threshold=0.5, k_matches=50)
-    # plt.imshow(stitched_beach_up)
-    # plt.show()
-    stitched_beach_down = stitch_sift(beach_images[4], beach_images[3], threshold=0.5, k_matches=50)
-    stitched_beach_down = stitch_sift(stitched_beach_down, beach_images[2], threshold=0.5, k_matches=50)
-    # plt.imshow(stitched_beach_down)
-    # plt.show()
-
-    # mask1 = np.ones((stitched_beach_up.shape[0], stitched_beach_up.shape[1]), dtype=np.uint8)
-    # mask1[:stitched_beach_up.shape[0]//2, :] = 0
-    # mask2 = np.ones((stitched_beach_down.shape[0], stitched_beach_down.shape[1]), dtype=np.uint8)
-    # mask2[stitched_beach_down.shape[0]//3:, :] = 0
-    # #
-    stitched_beach = stitch_sift(stitched_beach_up, stitched_beach_down, threshold=0.5, k_matches=50)
-    plt.imshow(stitched_beach)
-    plt.show()
 
     # points_pkl = pickle.load(open('data/points.pkl', 'rb'))
     # beach_points = points_pkl['beach']
