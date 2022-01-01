@@ -6,36 +6,31 @@ from matplotlib import pyplot as plt
 
 #Add imports if needed:
 from scipy.io import savemat, loadmat
+import pickle
 #end imports
 
 #Add extra functions here:
-STICHED_IMAGE_SCALE = 1.2
+STICHED_IMAGE_SCALE = 1.3
 
 
 def stitch_our_points(im1, im2, p1, p2):
     H2to1 = computeH(p1, p2)
 
     interp_method = cv2.INTER_CUBIC
-    im1_warp = warpH(im1, H2to1, interp_method)
+    im1_warp, warped_image_translation = warpH(im1, H2to1, interp_method)
 
-    warped_image_translation = np.array(im1_warp.shape[:2]) - np.array(STICHED_IMAGE_SCALE*np.array(im1.shape[:2]), dtype=np.int)
     stitched = imageStitching(im2, im1_warp, warped_image_translation)
 
     return stitched
 
 
 def stitch_sift(im1, im2, threshold=0.4, k_matches=None, mask1=None, mask2=None):
-    p1, p2 = getPoints_SIFT(im1, im2, threshold, mask1, mask2)
-
-    if(k_matches is not None):
-        p1 = p1[:, :min(k_matches, p1.shape[1])]
-        p2 = p2[:, :min(k_matches, p2.shape[1])]
+    p1, p2 = getPoints_SIFT(im1, im2, threshold, k_matches, mask1, mask2)
 
     H2to1 = computeH(p1, p2)
     interp_method = cv2.INTER_CUBIC
-    im1_warp = warpH(im1, H2to1, interp_method)
-    warped_image_translation = np.array(im1_warp.shape[:2]) - np.array(STICHED_IMAGE_SCALE * np.array(im1.shape[:2]),
-                                                                       dtype=np.int)
+    im1_warp, warped_image_translation = warpH(im1, H2to1, interp_method)
+
     stitched = imageStitching(im2, im1_warp, warped_image_translation)
     return stitched
 
@@ -125,28 +120,43 @@ def warpH(im1, H, interp_method=cv2.INTER_LINEAR):
     H = tH @ H
 
     # warp image:
-    warp_im1 = cv2.warpPerspective(im1, H, dsize=(int(STICHED_IMAGE_SCALE*im1.shape[1]) - bx,
-                                                  int(STICHED_IMAGE_SCALE*im1.shape[0]) - by),
-                                   flags=interp_method)
+    warp_im1 = cv2.warpPerspective(im1, H, dsize=(bwidth, bheight), flags=interp_method)
 
-    return warp_im1
+    return warp_im1, (-by, -bx)
 
 
 def imageStitching(img1, wrap_img2, warped_image_translation):
-    img1 = cv2.copyMakeBorder(img1,
-                              0,
-                              wrap_img2.shape[0] - img1.shape[0],
-                              0,
-                              wrap_img2.shape[1] - img1.shape[1],
-                              cv2.BORDER_CONSTANT,
-                              value=[0, 0, 0])
+    panoImg = np.zeros((img1.shape[0] + wrap_img2.shape[0],
+                        img1.shape[1] + wrap_img2.shape[1],
+                        3),
+                       dtype=np.uint8)
 
-    tH = np.array([[1, 0, warped_image_translation[1]],
-                   [0, 1, warped_image_translation[0]],
-                   [0, 0, 1]], dtype=np.float32)
+    # if im2 was translated right or down, then image 1 has to be translated there too,
+    # if it was translated left or up, it should be translated back
+    if warped_image_translation[1] >= 0:
+        im2_x = 0
+        im1_x = warped_image_translation[1]
+    else:
+        im2_x = -warped_image_translation[1]
+        im1_x = 0
 
-    translate_im1 = cv2.warpPerspective(img1, tH, dsize=(img1.shape[1], img1.shape[0]), flags=cv2.INTER_CUBIC)
-    panoImg = np.maximum(translate_im1, wrap_img2)
+    if warped_image_translation[0] >= 0:
+        im2_y = 0
+        im1_y = warped_image_translation[0]
+    else:
+        im2_y = -warped_image_translation[0]
+        im1_y = 0
+
+    panoImg[im1_y:im1_y + img1.shape[0], im1_x:im1_x + img1.shape[1]] =\
+        np.maximum(img1, panoImg[im1_y:im1_y + img1.shape[0], im1_x:im1_x + img1.shape[1]])
+    panoImg[im2_y:im2_y + wrap_img2.shape[0], im2_x:im2_x + wrap_img2.shape[1]] =\
+        np.maximum(wrap_img2, panoImg[im2_y:im2_y + wrap_img2.shape[0], im2_x:im2_x + wrap_img2.shape[1]])
+
+    # clear black space:
+    max_y = max(im1_y + img1.shape[0], im2_y + wrap_img2.shape[0])
+    max_x = max(im1_x + img1.shape[1], im2_x + wrap_img2.shape[1])
+    panoImg = panoImg[:max_y, :max_x]
+
     return panoImg
 
 def ransacH(matches, locs1, locs2, nIter, tol):
@@ -155,7 +165,7 @@ def ransacH(matches, locs1, locs2, nIter, tol):
     """
     return bestH
 
-def getPoints_SIFT(im1, im2, dist_thresh=0.4, mask1=None, mask2=None):
+def getPoints_SIFT(im1, im2, dist_thresh=0.4, k_matches=None, mask1=None, mask2=None):
 
     sift = cv2.SIFT_create()
     kp1, des1 = sift.detectAndCompute(im1, mask1)
@@ -166,9 +176,13 @@ def getPoints_SIFT(im1, im2, dist_thresh=0.4, mask1=None, mask2=None):
     bf_matcher = cv2.BFMatcher()
     matches = bf_matcher.knnMatch(des1, des2, k=2)
 
+    matches = sorted(matches, key=lambda x: x[0].distance)
+
     p1 = []
     p2 = []
     for m, n in matches:
+        if k_matches and len(p1) >= k_matches:
+            break
         if m.distance < dist_thresh * n.distance:
             p1.append(kp1[m.queryIdx].pt)
             p2.append(kp2[m.trainIdx].pt)
@@ -187,32 +201,46 @@ if __name__ == '__main__':
     for i in range(1, 6):
         im = cv2.imread('data/beach' + str(i) + '.jpg')
         im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
-        im = cv2.resize(im, (im.shape[0] // 1, im.shape[1] // 1))
+        im = cv2.resize(im, (im.shape[0] // 2, im.shape[1] // 2))
         beach_images.append(im)
     beach_images.reverse()
 
+
     # stitched_beach = beach_images[0]
     # for i in range(1, len(beach_images)):
-    #     stitched_beach = stitch_sift(stitched_beach, beach_images[i], threshold=0.7, k_matches=50)
+    #     stitched_beach = stitch_sift(stitched_beach, beach_images[i], threshold=0.7, k_matches=25)
     #     plt.imshow(stitched_beach)
     #     plt.show()
 
-    stitched_beach_up = stitch_sift(beach_images[0], beach_images[1], threshold=0.7, k_matches=50)
-    stitched_beach_up = stitch_sift(stitched_beach_up, beach_images[2], threshold=0.7, k_matches=50)
-    plt.imshow(stitched_beach_up)
-    plt.show()
-    stitched_beach_down = stitch_sift(beach_images[2], beach_images[3], threshold=0.5, k_matches=50)
-    stitched_beach_down = stitch_sift(stitched_beach_down, beach_images[4], threshold=0.5, k_matches=50)
-    plt.imshow(stitched_beach_down)
-    plt.show()
-    mask1 = np.ones((stitched_beach_up.shape[0], stitched_beach_up.shape[1]), dtype=np.uint8)
-    mask1[:stitched_beach_up.shape[0]//2, :] = 0
-    mask2 = np.ones((stitched_beach_down.shape[0], stitched_beach_down.shape[1]), dtype=np.uint8)
-    mask2[stitched_beach_down.shape[0]//3:, :] = 0
+    # stitched_01 = stitch_sift(beach_images[0], beach_images[1], threshold=0.7, k_matches=25)
+    # plt.imshow(stitched_01)
+    # plt.show()
+    #
+    # stitched_10 = stitch_sift(beach_images[1], beach_images[0], threshold=0.7, k_matches=25)
+    # plt.imshow(stitched_10)
+    # plt.show()
 
-    stitched_beach = stitch_sift(stitched_beach_up, stitched_beach_down, threshold=0.56, k_matches=50, mask1=mask1, mask2=mask2)
+    #
+    stitched_beach_up = stitch_sift(beach_images[0], beach_images[1], threshold=0.5, k_matches=50)
+    stitched_beach_up = stitch_sift(stitched_beach_up, beach_images[2], threshold=0.5, k_matches=50)
+    # plt.imshow(stitched_beach_up)
+    # plt.show()
+    stitched_beach_down = stitch_sift(beach_images[4], beach_images[3], threshold=0.5, k_matches=50)
+    stitched_beach_down = stitch_sift(stitched_beach_down, beach_images[2], threshold=0.5, k_matches=50)
+    # plt.imshow(stitched_beach_down)
+    # plt.show()
 
-
+    # mask1 = np.ones((stitched_beach_up.shape[0], stitched_beach_up.shape[1]), dtype=np.uint8)
+    # mask1[:stitched_beach_up.shape[0]//2, :] = 0
+    # mask2 = np.ones((stitched_beach_down.shape[0], stitched_beach_down.shape[1]), dtype=np.uint8)
+    # mask2[stitched_beach_down.shape[0]//3:, :] = 0
+    # #
+    stitched_beach = stitch_sift(stitched_beach_up, stitched_beach_down, threshold=0.5, k_matches=50)
     plt.imshow(stitched_beach)
     plt.show()
 
+    # points_pkl = pickle.load(open('data/points.pkl', 'rb'))
+    # beach_points = points_pkl['beach']
+    #
+    #
+    # pass
