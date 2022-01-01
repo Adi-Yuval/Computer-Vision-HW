@@ -10,28 +10,40 @@ import pickle
 #end imports
 
 #Add extra functions here:
-STICHED_IMAGE_SCALE = 1.3
+def translate_points(points, translation):
+    tH = np.array([[1, 0, -translation[0]],
+                   [0, 1, -translation[1]],
+                   [0, 0, 1]])
+    points_homo = np.concatenate([points, np.ones((1, points.shape[1]))], axis=0)
+    points_homo_trans = (tH @ points_homo)
+    points_trans = points_homo_trans[:2, :] / points_homo_trans[2, :]
+    return points_trans
 
 
-def stitch_our_points(im1, im2, p1, p2):
-    H2to1 = computeH(p1, p2)
+def stitch_our_points(im1, im2, p1, p2, return_im1_trans=False, ransach=False):
+    if ransach:
+        H2to1 = ransacH(7, p1, p2)
+    else:
+        H2to1 = computeH(p1, p2)
 
     interp_method = cv2.INTER_CUBIC
     im1_warp, warped_image_translation = warpH(im1, H2to1, interp_method)
 
-    stitched = imageStitching(im2, im1_warp, warped_image_translation)
-
+    stitched = imageStitching(im2, im1_warp, warped_image_translation, return_im1_trans)
     return stitched
 
 
-def stitch_sift(im1, im2, threshold=0.4, k_matches=None, mask1=None, mask2=None):
+def stitch_sift(im1, im2, threshold=0.4, k_matches=None, mask1=None, mask2=None, return_im1_trans=False, ransach=False):
     p1, p2 = getPoints_SIFT(im1, im2, threshold, k_matches, mask1, mask2)
 
-    H2to1 = computeH(p1, p2)
+    if ransach:
+        H2to1 = ransacH(4, p1, p2)
+    else:
+        H2to1 = computeH(p1, p2)
     interp_method = cv2.INTER_CUBIC
     im1_warp, warped_image_translation = warpH(im1, H2to1, interp_method)
 
-    stitched = imageStitching(im2, im1_warp, warped_image_translation)
+    stitched = imageStitching(im2, im1_warp, warped_image_translation, return_im1_trans)
     return stitched
 
 
@@ -58,7 +70,7 @@ def stitch_incline_sift():
     plt.show()
 
 
-def stitch_beach_sift():
+def stitch_beach_sift(ransach=False):
     beach_images = []
     for i in range(1, 6):
         im = cv2.imread('data/beach' + str(i) + '.jpg')
@@ -67,21 +79,21 @@ def stitch_beach_sift():
         beach_images.append(im)
     beach_images.reverse()
 
-    stitched_beach_up = stitch_sift(beach_images[0], beach_images[1], threshold=0.5, k_matches=50)
-    stitched_beach_up = stitch_sift(stitched_beach_up, beach_images[2], threshold=0.5, k_matches=50)
+    stitched_beach_up = stitch_sift(beach_images[0], beach_images[1], threshold=0.5, k_matches=50, ransach=ransach)
+    stitched_beach_up = stitch_sift(stitched_beach_up, beach_images[2], threshold=0.5, k_matches=50, ransach=ransach)
     # plt.imshow(stitched_beach_up)
     # plt.show()
-    stitched_beach_down = stitch_sift(beach_images[4], beach_images[3], threshold=0.5, k_matches=50)
-    stitched_beach_down = stitch_sift(stitched_beach_down, beach_images[2], threshold=0.5, k_matches=50)
+    stitched_beach_down = stitch_sift(beach_images[4], beach_images[3], threshold=0.5, k_matches=50, ransach=ransach)
+    stitched_beach_down = stitch_sift(stitched_beach_down, beach_images[2], threshold=0.5, k_matches=50, ransach=ransach)
     # plt.imshow(stitched_beach_down)
     # plt.show()
 
-    stitched_beach = stitch_sift(stitched_beach_up, stitched_beach_down, threshold=0.5, k_matches=50)
+    stitched_beach = stitch_sift(stitched_beach_up, stitched_beach_down, threshold=0.5, k_matches=50, ransach=ransach)
     plt.imshow(stitched_beach)
     plt.show()
 
 
-def stitch_sintra_sift():
+def stitch_sintra_sift(ransach=False):
     beach_images = []
     for i in range(1, 6):
         im = cv2.imread('data/sintra' + str(i) + '.JPG')
@@ -90,17 +102,83 @@ def stitch_sintra_sift():
         beach_images.append(im)
     beach_images.reverse()
 
-    stitched_beach_up = stitch_sift(beach_images[0], beach_images[1], threshold=0.5, k_matches=50)
-    stitched_beach_up = stitch_sift(stitched_beach_up, beach_images[2], threshold=0.5, k_matches=50)
+    stitched_beach_up = stitch_sift(beach_images[0], beach_images[1], threshold=0.5, k_matches=50, ransach=ransach)
+    stitched_beach_up = stitch_sift(stitched_beach_up, beach_images[2], threshold=0.5, k_matches=50, ransach=ransach)
     # plt.imshow(stitched_beach_up)
     # plt.show()
-    stitched_beach_down = stitch_sift(beach_images[4], beach_images[3], threshold=0.5, k_matches=50)
-    stitched_beach_down = stitch_sift(stitched_beach_down, beach_images[2], threshold=0.5, k_matches=50)
+    stitched_beach_down = stitch_sift(beach_images[4], beach_images[3], threshold=0.5, k_matches=50, ransach=ransach)
+    stitched_beach_down = stitch_sift(stitched_beach_down, beach_images[2], threshold=0.5, k_matches=50, ransach=ransach)
     # plt.imshow(stitched_beach_down)
     # plt.show()
 
-    stitched_beach = stitch_sift(stitched_beach_up, stitched_beach_down, threshold=0.5, k_matches=50)
+    stitched_beach = stitch_sift(stitched_beach_up, stitched_beach_down, threshold=0.5, k_matches=50, ransach=ransach)
     plt.imshow(stitched_beach)
+    plt.show()
+
+
+def stitch_beach_points(ransach=False):
+    images = []
+    for i in range(1, 6):
+        im = cv2.imread('data/beach' + str(i) + '.JPG')
+        im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+        im = cv2.resize(im, (im.shape[0] // 1, im.shape[1] // 1))
+        images.append(im)
+    # beach_images.reverse()
+
+    points_pkl = pickle.load(open('data/points.pkl', 'rb'))
+    points = points_pkl['beach']
+
+    p1 = points['1-2'][0]
+    p2 = points['1-2'][1]
+    stitched_up, trans_up = stitch_our_points(images[0], images[1], p1, p2, return_im1_trans=True, ransach=ransach)
+
+    p2_trans = translate_points(points['2-3'][0], trans_up)
+    p3 = points['2-3'][1]
+    stitched_up, trans_up = stitch_our_points(stitched_up, images[2], p2_trans, p3, return_im1_trans=True, ransach=ransach)
+
+    p3_trans_up = translate_points(points['3-4'][0], trans_up)
+
+    p5 = points['4-5'][1]
+    p4 = points['4-5'][0]
+    stitched_down, trans_down = stitch_our_points(images[4], images[3], p5, p4, return_im1_trans=True, ransach=ransach)
+
+    p4_trans = translate_points(points['3-4'][1], trans_down)
+
+    stitched = stitch_our_points(stitched_down, stitched_up, p4_trans, p3_trans_up, ransach=ransach)
+    plt.imshow(stitched)
+    plt.show()
+
+
+def stitch_sintra_points(ransach=False):
+    images = []
+    for i in range(1, 6):
+        im = cv2.imread('data/sintra' + str(i) + '.JPG')
+        im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+        im = cv2.resize(im, (im.shape[0] // 1, im.shape[1] // 1))
+        images.append(im)
+    # beach_images.reverse()
+
+    points_pkl = pickle.load(open('data/points.pkl', 'rb'))
+    points = points_pkl['sintra']
+
+    p1 = points['1-2'][0]
+    p2 = points['1-2'][1]
+    stitched_up, trans_up = stitch_our_points(images[0], images[1], p1, p2, return_im1_trans=True, ransach=ransach)
+
+    p2_trans = translate_points(points['2-3'][0], trans_up)
+    p3 = points['2-3'][1]
+    stitched_up, trans_up = stitch_our_points(stitched_up, images[2], p2_trans, p3, return_im1_trans=True, ransach=ransach)
+
+    p3_trans_up = translate_points(points['3-4'][0], trans_up)
+
+    p5 = points['4-5'][1]
+    p4 = points['4-5'][0]
+    stitched_down, trans_down = stitch_our_points(images[4], images[3], p5, p4, return_im1_trans=True, ransach=ransach)
+
+    p4_trans = translate_points(points['3-4'][1], trans_down)
+
+    stitched = stitch_our_points(stitched_down, stitched_up, p4_trans, p3_trans_up, ransach=ransach)
+    plt.imshow(stitched)
     plt.show()
 
 #Extra functions end
@@ -171,7 +249,7 @@ def warpH(im1, H, interp_method=cv2.INTER_LINEAR):
     return warp_im1, (-by, -bx)
 
 
-def imageStitching(img1, wrap_img2, warped_image_translation):
+def imageStitching(img1, wrap_img2, warped_image_translation, return_im1_trans=False):
     panoImg = np.zeros((img1.shape[0] + wrap_img2.shape[0],
                         img1.shape[1] + wrap_img2.shape[1],
                         3),
@@ -203,12 +281,31 @@ def imageStitching(img1, wrap_img2, warped_image_translation):
     max_x = max(im1_x + img1.shape[1], im2_x + wrap_img2.shape[1])
     panoImg = panoImg[:max_y, :max_x]
 
-    return panoImg
+    if return_im1_trans:
+        return panoImg, (im1_y, im1_x)
+    else:
+        return panoImg
 
-def ransacH(matches, locs1, locs2, nIter, tol):
-    """
-    Your code here
-    """
+def ransacH(matches, locs1, locs2, nIter=50, tol=12000):
+    N = locs1.shape[1]
+    stacked_p2 = np.vstack((locs2, np.ones(N)))
+    best_inliers_n = 0
+    best_inliers = []
+    for iter in range(nIter):
+        rand_idxs = np.random.choice(np.arange(N), matches, replace=False)
+        chosen_p1 = locs1[:, rand_idxs]
+        chosen_p2 = locs2[:, rand_idxs]
+        H2to1 = computeH(chosen_p1, chosen_p2)
+        p2in1 = H2to1 @ stacked_p2
+        p2in1 = p2in1 / p2in1[2, :]
+        p2in1 = p2in1[0:2, :]
+        L2dists = np.sqrt(np.sum((p2in1 - locs1) ** 2, 0))
+        inliers = (locs1[:, L2dists < tol], locs2[:, L2dists < tol])
+        n_inliers = np.sum(L2dists < tol)
+        if n_inliers > best_inliers_n:
+            best_inliers_n = n_inliers
+            best_inliers = inliers
+    bestH = computeH(best_inliers[0], best_inliers[1])
     return bestH
 
 def getPoints_SIFT(im1, im2, dist_thresh=0.4, k_matches=None, mask1=None, mask2=None):
@@ -241,12 +338,15 @@ if __name__ == '__main__':
 
     # stitch_incline_our_points()
     # stitch_incline_sift()
+
     # stitch_beach_sift()
     # stitch_sintra_sift()
 
+    # stitch_beach_points()
+    # stitch_sintra_points()
 
-    # points_pkl = pickle.load(open('data/points.pkl', 'rb'))
-    # beach_points = points_pkl['beach']
+    # stitch_beach_sift(ransach=True)
+    # stitch_sintra_sift(ransach=True)
     #
-    #
-    # pass
+    # stitch_beach_points(ransach=True)
+    # stitch_sintra_points(ransach=True)
