@@ -4,10 +4,12 @@ import cv2
 import scipy
 from matplotlib import pyplot as plt
 
+
 #Add imports if needed:
 from scipy.io import savemat, loadmat
 import pickle
 #end imports
+
 
 #Add extra functions here:
 def translate_points(points, translation):
@@ -181,6 +183,22 @@ def stitch_sintra_points(ransach=False):
     plt.imshow(stitched)
     plt.show()
 
+
+def stitch_my_images():
+    images = []
+    for i in range(1, 4):
+        im = cv2.imread('my_data/my_image' + str(i) + '.jpg')
+        im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+        im = cv2.resize(im, (im.shape[0] // 1, im.shape[1] // 1))
+        images.append(im)
+        # plt.imshow(im)
+        # plt.show()
+
+    my_stitched = stitch_sift(images[0], images[1], threshold=0.5, k_matches=50)
+    my_stitched = stitch_sift(images[2], my_stitched, threshold=0.5, k_matches=50)
+    plt.imshow(my_stitched)
+    plt.show()
+
 #Extra functions end
 
 # HW functions:
@@ -286,6 +304,7 @@ def imageStitching(img1, wrap_img2, warped_image_translation, return_im1_trans=F
     else:
         return panoImg
 
+
 def ransacH(matches, locs1, locs2, nIter=50, tol=12000):
     N = locs1.shape[1]
     stacked_p2 = np.vstack((locs2, np.ones(N)))
@@ -307,6 +326,7 @@ def ransacH(matches, locs1, locs2, nIter=50, tol=12000):
             best_inliers = inliers
     bestH = computeH(best_inliers[0], best_inliers[1])
     return bestH
+
 
 def getPoints_SIFT(im1, im2, dist_thresh=0.4, k_matches=None, mask1=None, mask2=None):
 
@@ -336,17 +356,20 @@ def getPoints_SIFT(im1, im2, dist_thresh=0.4, k_matches=None, mask1=None, mask2=
 if __name__ == '__main__':
     print('my_homography')
 
-    # stitch_incline_our_points()
-    # stitch_incline_sift()
+    stitch_incline_our_points()
+    stitch_incline_sift()
 
-    # stitch_beach_sift()
-    # stitch_sintra_sift()
+    stitch_beach_sift()
+    stitch_sintra_sift()
 
-    # stitch_beach_points()
-    # stitch_sintra_points()
+    stitch_beach_points()
+    stitch_sintra_points()
 
-    # stitch_beach_sift(ransach=True)
-    # stitch_sintra_sift(ransach=True)
-    #
-    # stitch_beach_points(ransach=True)
-    # stitch_sintra_points(ransach=True)
+    stitch_beach_sift(ransach=True)
+    stitch_sintra_sift(ransach=True)
+
+    stitch_beach_points(ransach=True)
+    stitch_sintra_points(ransach=True)
+
+    stitch_my_images()
+
