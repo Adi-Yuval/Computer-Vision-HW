@@ -44,7 +44,9 @@ def create_ref(im_path):
 
     H = mh.computeH(p1.T, target.T)
 
-    ref_image = cv2.warpPerspective(im, H, (target_width, target_height))
+    # cv2.warpPerspective(im, H, (target_width, target_height))
+    ref_image, (bx, by) = mh.warpH(im, H)
+    ref_image = ref_image[bx:target_height + bx, by:target_width + by, :]
     return ref_image
 
 
@@ -66,23 +68,25 @@ def im2im(source_ref, dest_im, idx):
     dest_warped, (bx, by) = mh.warpH(dest_im, H)
     np.copyto(dest_warped[bx:source_ref.shape[0] + bx, by:source_ref.shape[1] + by], source_ref)
 
-    plt.imshow(dest_warped)
-    plt.show()
+    # plt.imshow(dest_warped)
+    # plt.show()
 
-    p1, p2 = mh.getPoints_SIFT(dest_im, dest_warped, 0.7, 50)
+    p1, p2 = mh.getPoints_SIFT(dest_im, dest_warped, 0.5, 50)
     H_back = mh.computeH(p2, p1)
 
-    planted_image = cv2.warpPerspective(dest_warped, H_back, (dest_im.shape[1], dest_im.shape[0]))
+    # planted_image = cv2.warpPerspective(dest_warped, H_back, (dest_im.shape[1], dest_im.shape[0]))
+    planted_image, (bx, by) = mh.warpH(dest_warped, H_back)
+    planted_image = planted_image[bx:dest_im.shape[0]+bx, by:dest_im.shape[1]+by, :]
     return planted_image
 
 
 if __name__ == '__main__':
     print('my_ar')
 
-    ref_image = create_ref("my_data/book3.jpg")
-    plt.imshow(ref_image)
-    plt.show()
-    cv2.imwrite("my_data/book3_ref.jpg", cv2.cvtColor(ref_image, cv2.COLOR_RGB2BGR))
+    # ref_image = create_ref("my_data/book_cover_img.jpg")
+    # plt.imshow(ref_image)
+    # plt.show()
+    # cv2.imwrite("my_data/book_cover_ref.jpg", cv2.cvtColor(ref_image, cv2.COLOR_RGB2BGR))
 
     scene = cv2.cvtColor(cv2.imread("my_data/3books.jpg"), cv2.COLOR_BGR2RGB)
 
