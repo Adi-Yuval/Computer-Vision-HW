@@ -88,7 +88,7 @@ def gkern(l=5, sig=1.):
     return kernel / np.sum(kernel)
 
 
-def epipolar_correspondences(I1, I2, F, pts1, patch_size=9, npts=300):
+def epipolar_correspondences(I1, I2, F, pts1, patch_size=9, npts=200):
     """
     Epipolar Correspondences
     [I] I1, image 1 (H1xW1 matrix)
@@ -115,19 +115,15 @@ def epipolar_correspondences(I1, I2, F, pts1, patch_size=9, npts=300):
         y_points = np.clip(y_points, patch_size//2 + 1, I2.shape[0] - 1 - patch_size//2)
         x_points = np.clip(x_points, patch_size//2 + 1, I2.shape[1] - 1 - patch_size//2)
 
-
         I1_patch = I1[pts1[idx, 1] - (patch_size-1)//2 : pts1[idx, 1] + (patch_size+1)//2,
                       pts1[idx, 0] - (patch_size-1)//2 : pts1[idx, 0] + (patch_size+1)//2]
-
-        gaussian_patch = gkern(patch_size, 0.3)
-        gaussian_patch = np.repeat(gaussian_patch[:, :, np.newaxis], 3, axis=2)
 
         patches_distance_min = np.inf
         x_min, y_min = -1, -1
         for x, y in zip(x_points, y_points):
-            I2_patch = I1[y - (patch_size-1)//2 : y + (patch_size+1)//2, x - (patch_size-1)//2 : x + (patch_size+1)//2]
+            I2_patch = I2[y - (patch_size-1)//2 : y + (patch_size+1)//2, x - (patch_size-1)//2 : x + (patch_size+1)//2]
 
-            patches_distance = np.sum( ((I1_patch - I2_patch) * gaussian_patch)**2 )
+            patches_distance = np.sum((I1_patch - I2_patch)**2)
             if patches_distance < patches_distance_min:
                 patches_distance_min = patches_distance
                 x_min = x
@@ -201,31 +197,6 @@ def camera2(E):
     return M2s
 
 
-# def determine_best_M2(M1, ex2_canidates, K2, pts1, pts2):
-#     """
-#     Determine the best M2 matrix
-#     [I] ex2_canidates, a list of possible ex2 matrices
-#     [O] best_M2, the best M2 matrix (3x4 matrix)
-#     """
-#     best_M2 = None
-#     best_behind_camera = 0
-#     for i in range(4):
-#         ex2 = ex2_canidates[:, :, i]
-#         M2 = K2 @ ex2
-#         pts3d = triangulate(M1, pts1, M2, pts2)
-#         pts3d = np.concatenate((pts3d, np.ones((pts3d.shape[0], 1))), axis=1)
-#
-#         pts1_back = (M1 @ pts3d.T).T
-#         pts2_back = (M2 @ pts3d.T).T
-#
-#         behind_camera = np.sum(pts1_back[:, 2] < 0) + np.sum(pts2_back[:, 2] < 0)
-#         if behind_camera > best_behind_camera:
-#             best_M2 = M2
-#             best_behind_camera = behind_camera
-#
-#     return best_M2
-
-
 def determine_best_M2(M1, ex2_canidates, K2, pts1, pts2):
     """
     Determine the best M2 matrix
@@ -265,7 +236,7 @@ if __name__ == "__main__":
     F = eight_point(pts1, pts2, pmax=max(im1.shape[0], im1.shape[1]))
 
     tempale_coords_im1 = np.load("data/temple_coords.npz")['pts1']
-    tempale_coords_im2 = epipolar_correspondences(im1, im2, F, tempale_coords_im1, patch_size=5, npts=400)
+    tempale_coords_im2 = epipolar_correspondences(im1, im2, F, tempale_coords_im1, patch_size=17, npts=200)
 
     intrinsics = np.load('data/intrinsics.npz')
     K1 = intrinsics['K1']
@@ -279,16 +250,9 @@ if __name__ == "__main__":
 
     # compute the 3D points
     pts3d = triangulate(M1, tempale_coords_im1, M2, tempale_coords_im2)
-    # pts3d = np.concatenate((pts3d, np.ones((pts3d.shape[0], 1))), axis=1)
 
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
-    ax.scatter(pts3d[:, 2], pts3d[:, 0], pts3d[:, 1], s=30)
-    # ax.set_ylim(3.5, 4.5)
-    # ax.set_xlabel('X')
-    # ax.set_ylabel('Y')
-    # ax.set_zlabel('Z')
-    # ax.set_xlim(3.9, 4.2)
-    ax.view_init(45, 90)
+    ax.scatter(pts3d[:, 2], -pts3d[:, 0], -pts3d[:, 1], s=30)
 
     plt.show()
